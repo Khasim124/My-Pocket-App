@@ -2,27 +2,36 @@ import { InputGroup, Form, DropdownButton, Dropdown } from "react-bootstrap";
 import { BsSearch } from "react-icons/bs";
 
 export default function SearchFilter({ filter, setFilter, search, setSearch }) {
+
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const filters = ["all", "completed", "incomplete", "today"];
+  const capitalizedFilter = capitalize(filter);
+
   return (
     <InputGroup className="mb-3">
-      <InputGroup.Text>
+      <InputGroup.Text aria-label="Search icon">
         <BsSearch />
       </InputGroup.Text>
       <Form.Control
         placeholder="Search tasks..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        aria-label="Search tasks"
       />
       <DropdownButton
-        title={filter}
-        onSelect={(val) => setFilter(val)}
+        title={`Filter: ${capitalizedFilter}`}
+        onSelect={(val) => setFilter(val.toLowerCase())}
         variant="primary"
         align="end"
         id="filter-dropdown"
       >
-        <Dropdown.Item eventKey="All">All</Dropdown.Item>
-        <Dropdown.Item eventKey="Completed">Completed</Dropdown.Item>
-        <Dropdown.Item eventKey="Incomplete">Incomplete</Dropdown.Item>
-        <Dropdown.Item eventKey="Today">Today</Dropdown.Item>
+        {filters.map((f) => (
+          <Dropdown.Item key={f} eventKey={f}>
+            {f === filter ? "✅ " : ""}
+            {capitalize(f)}
+          </Dropdown.Item>
+        ))}
       </DropdownButton>
     </InputGroup>
   );

@@ -1,98 +1,118 @@
-import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+// src/Dashboard/Dashboard.jsx
+import React, { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import Header from "./Header";
+import { Button, Toast, ToastContainer } from "react-bootstrap";
+
 import StatsSection from "./StatsSection";
 import SearchFilter from "./SearchFilter";
 import TaskList from "./TaskList";
 import AddTaskModal from "./AddTaskModal";
-import "../App.css";
+
+import {
+  fetchTasks,
+  fetchTaskStats,
+  addTask,
+  toggleTaskStatus,
+  deleteTask,
+  updateTask,
+} from "../features/tasks/taskThunks";
+
+import { setFilterStatus, setSearchQuery } from "../features/tasks/taskSlice";
+import { logout } from "../features/auth/authSlice";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
-  const userId = user?.id;
+  const dispatch = useDispatch();
 
-  const [stats, setStats] = useState({
-    total: 0,
-    completed: 0,
-    pending: 0,
-    today: 0,
-  });
-  const [todos, setTodos] = useState([]);
-  const [filter, setFilter] = useState("All");
-  const [search, setSearch] = useState("");
+  const user = useSelector((state) => state.auth.user);
+  const { tasks, stats, loading, error, filterStatus, searchQuery } =
+    useSelector((state) => state.tasks);
+
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDesc, setEditedDesc] = useState("");
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [addTitleError, setAddTitleError] = useState("");
 
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
   useEffect(() => {
-    if (!userId) navigate("/login");
-  }, [userId, navigate]);
+    if (user?.id) {
+      dispatch(fetchTasks());
+      dispatch(fetchTaskStats());
+    } else {
+      navigate("/login");
+    }
+  }, [user?.id, dispatch, navigate]);
 
   const isToday = (dateStr) => {
-    const taskDate = new Date(dateStr);
+    const date = new Date(dateStr);
     const today = new Date();
     return (
-      taskDate.getDate() === today.getDate() &&
-      taskDate.getMonth() === today.getMonth() &&
-      taskDate.getFullYear() === today.getFullYear()
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
     );
   };
 
-  const fetchTodos = useCallback(async () => {
-    try {
-      const res = await axios.get(`http://localhost:3000/todos/${userId}`);
-      setTodos(res.data);
-    } catch {
-      setTodos([]);
+  const filteredTasks = tasks.filter((task) => {
+    let matchesFilter = true;
+    switch (filterStatus.toLowerCase()) {
+      case "completed":
+        matchesFilter = task.status === true;
+        break;
+      case "incomplete":
+      case "pending":
+        matchesFilter = task.status === false;
+        break;
+      case "today":
+        matchesFilter = isToday(task.createdAt);
+        break;
+      default:
+        matchesFilter = true;
     }
-  }, [userId]);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await axios.get(`http://localhost:3000/todos/${userId}`);
-      const all = res.data;
-      const completed = all.filter((t) => t.status).length;
-      const pending = all.filter((t) => !t.status).length;
-      const today = all.filter((t) => isToday(t.createdAt)).length;
-      setStats({ total: all.length, completed, pending, today });
-    } catch {
-      setStats({ total: 0, completed: 0, pending: 0, today: 0 });
-    }
-  }, [userId]);
+    const matchesSearch = (task.title ?? "")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
 
-  useEffect(() => {
-    if (userId) {
-      fetchTodos();
-      fetchStats();
-    }
-  }, [userId, fetchTodos, fetchStats]);
+    return matchesFilter && matchesSearch;
+  });
+
+  const showSuccessToast = (msg) => {
+    setToastMessage(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) {
-      setAddTitleError("Task title is required");
+      setAddTitleError("Title is required");
       return;
     }
 
     try {
-      await axios.post("http://localhost:3000/todos", {
-        title: newTaskTitle,
-        description: newTaskDesc,
-        userId,
-      });
+      await dispatch(
+        addTask({
+          title: newTaskTitle,
+          description: newTaskDesc,
+        })
+      ).unwrap();
+
       setNewTaskTitle("");
       setNewTaskDesc("");
       setAddTitleError("");
       setShowAddModal(false);
-      fetchTodos();
-      fetchStats();
+      dispatch(fetchTaskStats());
+      dispatch(fetchTasks());
+      showSuccessToast("✅ Task added successfully");
     } catch {
-      alert("Failed to add task");
+      alert("❌ Failed to add task");
     }
   };
 
@@ -105,22 +125,25 @@ export default function Dashboard() {
     if (!window.confirm("Mark this task as completed?")) return;
 
     try {
-      await axios.put(`http://localhost:3000/todos/${id}/toggle`);
-      fetchTodos();
-      fetchStats();
+      await dispatch(toggleTaskStatus(id)).unwrap();
+      dispatch(fetchTaskStats());
+      dispatch(fetchTasks());
+      showSuccessToast("✅ Task marked as completed");
     } catch {
-      alert("Failed to update task status");
+      alert("❌ Failed to update task status");
     }
   };
 
-  const deleteTask = async (id) => {
+  const deleteTaskHandler = async (id) => {
     if (!window.confirm("Are you sure you want to delete this task?")) return;
+
     try {
-      await axios.delete(`http://localhost:3000/todos/${id}`);
-      fetchTodos();
-      fetchStats();
+      await dispatch(deleteTask(id)).unwrap();
+      dispatch(fetchTaskStats());
+      dispatch(fetchTasks());
+      showSuccessToast("🗑️ Task deleted successfully");
     } catch {
-      alert("Failed to delete task");
+      alert("❌ Failed to delete task");
     }
   };
 
@@ -132,48 +155,109 @@ export default function Dashboard() {
 
   const handleSaveEdit = async (id) => {
     try {
-      await axios.put(`http://localhost:3000/todos/${id}`, {
-        title: editedTitle,
-        description: editedDesc,
-      });
+      await dispatch(
+        updateTask({
+          id,
+          updates: { title: editedTitle, description: editedDesc },
+        })
+      ).unwrap();
       setEditingTaskId(null);
-      fetchTodos();
-      fetchStats();
+      dispatch(fetchTasks());
+      dispatch(fetchTaskStats());
+      showSuccessToast("✏️ Task updated successfully");
     } catch {
-      alert("Failed to update task");
+      alert("❌ Failed to update task");
     }
   };
 
-  const filteredTasks = todos.filter((task) => {
-    const matchFilter =
-      filter === "All"
-        ? true
-        : filter === "Completed"
-        ? task.status
-        : filter === "Today"
-        ? isToday(task.createdAt)
-        : !task.status;
-    const matchSearch = task.title.toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  });
+  const onFilterChange = (filter) => {
+    dispatch(setFilterStatus(filter.toLowerCase()));
+  };
+
+  const onSearchChange = (search) => {
+    dispatch(setSearchQuery(search));
+  };
+
+  const handleLogout = () => {
+    const confirmLogout = window.confirm("Are you sure you want to logout?");
+    if (confirmLogout) {
+      dispatch(logout());
+      navigate("/login");
+    }
+  };
 
   return (
-    <div className="container mt-4">
-      <Header
-        user={user}
-        onAddClick={() => setShowAddModal(true)}
-        onLogout={() => {
-          localStorage.removeItem("user");
-          navigate("/login");
-        }}
-      />
+    <div className="dashboard-wrapper min-vh-100 py-4">
+      {/* Toast message */}
+      <ToastContainer position="top-end" className="p-3">
+        <Toast
+          bg="success"
+          onClose={() => setShowToast(false)}
+          show={showToast}
+          delay={3000}
+          autohide
+        >
+          <Toast.Body className="text-white fw-semibold">
+            {toastMessage}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
+
+      {/* Top Bar */}
+      <div className="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+        <h4 className="text-primary m-0">📄 My Pocket App</h4>
+        <div className="d-flex align-items-center">
+          <span
+            className="me-2"
+            style={{
+              fontWeight: "bold",
+              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+              color: "#e8a317",
+              fontSize: "1.2rem",
+              textShadow: "1px 1px 2px #b47f09",
+            }}
+          >
+            👤 {user?.user_name || user?.user_email?.split("@")[0] || "User"}
+          </span>
+          <button
+            className="btn btn-outline-danger btn-sm"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
       <StatsSection stats={stats} />
+
+      {/* Task Header */}
+      <div className="d-flex justify-content-between align-items-center mt-4 mb-2">
+        <h5 className="m-0">
+          📄 Your Tasks{" "}
+          <small className="text-muted">({filteredTasks.length} shown)</small>
+        </h5>
+        <Button
+          variant="dark"
+          className="px-3 fw-semibold"
+          onClick={() => setShowAddModal(true)}
+        >
+          Add Task
+        </Button>
+      </div>
+
+      {/* Search & Filter */}
       <SearchFilter
-        filter={filter}
-        setFilter={setFilter}
-        search={search}
-        setSearch={setSearch}
+        filter={filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}
+        setFilter={onFilterChange}
+        search={searchQuery}
+        setSearch={onSearchChange}
       />
+
+      {/* Task List */}
+      {loading && <p>Loading tasks...</p>}
+      {error && <p className="text-danger">Error: {error}</p>}
+
       <TaskList
         tasks={filteredTasks}
         isToday={isToday}
@@ -182,11 +266,14 @@ export default function Dashboard() {
         editedDesc={editedDesc}
         onEditClick={handleEditClick}
         onSaveEdit={handleSaveEdit}
-        onDelete={deleteTask}
+        onDelete={deleteTaskHandler}
         onToggle={toggleTask}
         setEditedTitle={setEditedTitle}
         setEditedDesc={setEditedDesc}
+        todayBadgeColor="warning"
       />
+
+      {/* Add Task Modal */}
       <AddTaskModal
         show={showAddModal}
         onHide={() => setShowAddModal(false)}

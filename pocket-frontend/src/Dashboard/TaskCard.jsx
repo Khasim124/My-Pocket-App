@@ -1,4 +1,11 @@
-import { Card, Button, Form, Badge } from "react-bootstrap";
+import {
+  Card,
+  Button,
+  Form,
+  Badge,
+  OverlayTrigger,
+  Tooltip,
+} from "react-bootstrap";
 import { BsCheckCircle, BsTrash, BsPencilSquare, BsSave } from "react-icons/bs";
 
 export default function TaskCard({
@@ -14,9 +21,11 @@ export default function TaskCard({
   setEditedTitle,
   setEditedDesc,
 }) {
+  const highlightToday = task.createdAt && isToday(task.createdAt);
+
   return (
     <Card
-      className={`task-card shadow-sm h-100 ${
+      className={`task-card shadow-sm h-100 hover-shadow ${
         task.status ? "completed" : "pending"
       }`}
     >
@@ -32,16 +41,23 @@ export default function TaskCard({
             ) : (
               <Card.Title
                 className="mb-1 text-wrap"
-                style={{ fontWeight: "700", fontSize: "1.1rem", color: "#222" }}
+                style={{
+                  fontWeight: "700",
+                  fontSize: "1.1rem",
+                  color: task.status ? "#28a745" : "#222",
+                }}
               >
                 {task.title}
-                {isToday(task.createdAt) && (
+                {highlightToday && (
                   <Badge
-                    bg=""
                     style={{
-                      backgroundColor: "#f1c40f", 
-                      color: "white",
+                      backgroundColor: "#f1c40f", // yellow background
+                      color: "#fff", // white text
                       marginLeft: "10px",
+                      fontWeight: "600",
+                      fontSize: "0.85rem",
+                      padding: "0.25em 0.5em",
+                      borderRadius: "0.25rem",
                     }}
                   >
                     Today
@@ -79,7 +95,9 @@ export default function TaskCard({
               className="text-wrap"
               style={{ fontWeight: "500", fontSize: "0.95rem", color: "#555" }}
             >
-              {task.description}
+              {task.description || (
+                <em className="text-muted">No description</em>
+              )}
             </Card.Text>
           )}
 
@@ -107,39 +125,55 @@ export default function TaskCard({
 
           <div className="d-flex justify-content-end mt-3 gap-2">
             {!task.status && (
-              <Button
-                variant="outline-success"
-                size="sm"
-                onClick={() => onToggle(task.id, task.status)}
-                title="Mark as completed"
+              <OverlayTrigger
+                placement="top"
+                overlay={<Tooltip>Mark as completed</Tooltip>}
               >
-                <BsCheckCircle />
-              </Button>
+                <Button
+                  variant="outline-success"
+                  size="sm"
+                  onClick={() => onToggle(task.id, task.status)}
+                  aria-label="Mark task as completed"
+                >
+                  <BsCheckCircle />
+                </Button>
+              </OverlayTrigger>
             )}
+
             {editingTaskId === task.id ? (
-              <Button
-                size="sm"
-                variant="outline-primary"
-                onClick={() => onSaveEdit(task.id)}
-              >
-                <BsSave />
-              </Button>
+              <OverlayTrigger placement="top" overlay={<Tooltip>Save</Tooltip>}>
+                <Button
+                  size="sm"
+                  variant="outline-primary"
+                  onClick={() => onSaveEdit(task.id)}
+                  aria-label="Save task edits"
+                >
+                  <BsSave />
+                </Button>
+              </OverlayTrigger>
             ) : (
+              <OverlayTrigger placement="top" overlay={<Tooltip>Edit</Tooltip>}>
+                <Button
+                  size="sm"
+                  variant="outline-primary"
+                  onClick={() => onEditClick(task)}
+                  aria-label="Edit task"
+                >
+                  <BsPencilSquare />
+                </Button>
+              </OverlayTrigger>
+            )}
+
+            <OverlayTrigger placement="top" overlay={<Tooltip>Delete</Tooltip>}>
               <Button
                 size="sm"
-                variant="outline-primary"
-                onClick={() => onEditClick(task)}
+                variant="outline-danger"
+                onClick={() => onDelete(task.id)}
+                aria-label="Delete task"
               >
-                <BsPencilSquare />
+                <BsTrash />
               </Button>
-            )}
-            <Button
-              size="sm"
-              variant="outline-danger"
-              onClick={() => onDelete(task.id)}
-            >
-              <BsTrash />
-            </Button>
+            </OverlayTrigger>
           </div>
         </div>
       </Card.Body>

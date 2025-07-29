@@ -16,58 +16,68 @@ export default function VerifyCode() {
   const [error, setError] = useState("");
 
   return (
-    <div className="p-4" style={{ maxWidth: "400px", margin: "auto" }}>
-      <h4 className="text-center mb-4">Enter Verification Code</h4>
-      <Formik
-        initialValues={{ code: "" }}
-        validationSchema={codeSchema}
-        onSubmit={(values) => {
-          if (values.code === "1234") {
-            navigate("/reset-password");
-          } else {
-            setError("Invalid code. Try again.");
-          }
-        }}
-      >
-        {({
-          handleSubmit,
-          handleChange,
-          handleBlur,
-          values,
-          errors,
-          touched,
-          isSubmitting,
-        }) => (
-          <Form onSubmit={handleSubmit} noValidate>
-            <Form.Group className="mb-3">
-              <Form.Label>Verification Code</Form.Label>
-              <Form.Control
-                type="text"
-                name="code"
-                placeholder="Enter 4-digit code (1234)"
-                value={values.code}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                isInvalid={touched.code && !!errors.code}
-              />
-              <Form.Control.Feedback type="invalid">
-                {errors.code}
-              </Form.Control.Feedback>
-            </Form.Group>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h2>Enter Verification Code</h2>
 
-            {error && <div className="text-danger mb-2">{error}</div>}
+        <Formik
+          initialValues={{ code: "" }}
+          validationSchema={codeSchema}
+          onSubmit={(values, { setSubmitting }) => {
+            setError("");
+            const trimmedCode = values.code.trim();
+            if (trimmedCode === "1234") {
+              navigate("/reset-password");
+            } else {
+              setError("Invalid code. Try again.");
+            }
+            setSubmitting(false);
+          }}
+        >
+          {({
+            handleSubmit,
+            handleChange,
+            handleBlur,
+            values,
+            errors,
+            touched,
+            isSubmitting,
+          }) => (
+            <Form onSubmit={handleSubmit} noValidate>
+              <Form.Group className="mb-3">
+                <Form.Label>Verification Code</Form.Label>
+                <Form.Control
+                  type="text"
+                  name="code"
+                  placeholder="Enter 4-digit code (1234)"
+                  value={values.code}
+                  onChange={(e) => {
+                    setError("");
+                    handleChange(e);
+                  }}
+                  onBlur={handleBlur}
+                  isInvalid={touched.code && !!errors.code}
+                  maxLength={4}
+                />
+                <Form.Control.Feedback type="invalid">
+                  {errors.code}
+                </Form.Control.Feedback>
+              </Form.Group>
 
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSubmitting}
-              className="w-100"
-            >
-              Verify
-            </Button>
-          </Form>
-        )}
-      </Formik>
+              {error && <div className="text-danger mb-2">{error}</div>}
+
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isSubmitting}
+                className="w-100"
+              >
+                Verify
+              </Button>
+            </Form>
+          )}
+        </Formik>
+      </div>
     </div>
   );
 }
