@@ -5,43 +5,55 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const passport = require('passport');
 const createError = require('http-errors');
-
-require('./config/passport')(passport);
-const { sequelize } = require('./model/User_details');
-const userRoutes = require('./routes/user_routers');
-const todoRoutes = require('./routes/todo_routers');
+const helmet = require('helmet');
+require('dotenv').config();
 
 const app = express();
 
-sequelize.authenticate()
-  .then(() => console.log("✅ DB Connected"))
-  .catch(err => console.error("❌ DB Connection Error:", err));
+//  Passport configuration
+require('./config/passport')(passport);
 
+//  Database connection
+const sequelize = require('./config/db');
+
+// Test DB connection
+sequelize.authenticate()
+  .then(() => console.log("✅ Database connected successfully"))
+  .catch(err => console.error("❌ Database connection error:", err));
+
+//  Sync models in non-production 
 if (process.env.NODE_ENV !== 'production') {
-  sequelize.sync({ alter: true })
-    .then(() => console.log("✅ Tables synced (dev only)"))
-    .catch(err => console.error("❌ Sync Error:", err));
+  sequelize.sync({ alter: true }) 
+    .then(() => console.log("✅ Database synced"))
+    .catch(err => console.error("❌ Sync error:", err));
 }
 
-app.use(cors());
+//  Middleware setup
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3001", 
+  credentials: true,
+}));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
-app.use("/userdetails", userRoutes);
+//  Routes
+const userRoutes = require('./routes/userRoutes');
+const todoRoutes = require('./routes/todoRoutes');
+
+app.use("/userdetails", userRoutes); 
 app.use("/todos", todoRoutes);
 
-app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'));
-});
-
+//  Error Handling
 app.use((req, res, next) => next(createError(404)));
-
 app.use((err, req, res, next) => {
-  res.status(err.status || 500).json({ message: err.message });
+  console.error("❌", err);
+  res.status(err.status || 500).json({
+    message: err.message || "Internal Server Error"
+  });
 });
 
 module.exports = app;
